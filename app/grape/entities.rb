@@ -14,6 +14,10 @@ module RubyChina
       end
     end
 
+    class UserTopic < Grape::Entity
+      expose :id, :title, :body, :body_html, :created_at, :updated_at, :replied_at, :replies_count, :node_name, :node_id, :last_reply_user_login
+    end
+
     class DetailUser < Grape::Entity
       expose :id, :name, :login, :location, :company, :twitter, :website, :bio, :tagline, :github_url
       expose :email do |model, opts|
@@ -31,16 +35,12 @@ module RubyChina
         end
       end
       expose(:topics, :unless => { :collection => true }) do |model, opts|
-        model.topics.recent.limit(opts[:topics_limit] ||= 1).as_json(:only => [:id, :title, :created_at, :node_name, :replies_count])
+        APIEntities::UserTopic.represent model.topics.recent.limit(opts[:topics_limit] ||= 1)
       end
     end
 
-    class UserTopic < Grape::Entity
-      expose :id, :title, :body, :body_html, :created_at, :updated_at, :replied_at, :replies_count, :node_name, :node_id, :last_reply_user_login
-    end
-
     class Reply < Grape::Entity
-      expose :id, :body, :body_html, :created_at, :updated_at
+      expose :id, :body, :body_html, :created_at, :updated_at, :deleted_at
       expose :user, :using => APIEntities::User
     end
     
@@ -54,7 +54,11 @@ module RubyChina
       expose(:hits) { |topic| topic.hits.to_i }
       expose :user, :using => APIEntities::User
       # replies only exposed when a single topic is fetched
-      expose :replies, :using => APIEntities::Reply, :unless => { :collection => true }
+      expose(:replies, :unless => { :collection => true }) do |model, opts|
+        replies = model.replies
+        replies = replies.unscoped if opts[:include_deleted]
+        APIEntities::Reply.represent(replies.asc(:_id))
+      end
     end
 
     class Node < Grape::Entity

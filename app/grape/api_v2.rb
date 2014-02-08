@@ -18,10 +18,13 @@ module RubyChina
       # Get active topics list
       # params[:page]
       # params[:per_page]: default is 30
+      # params[:type]: default(or empty) excellent no_reply popular last
       # Example
       #   /api/topics/index.json?page=1&per_page=15
       get do
-        @topics = Topic.last_actived.includes(:user).paginate(:page => params[:page], :per_page => params[:per_page] || 30)
+        @topics = Topic.last_actived
+        @topics = @topics.send(params[:type]) if ['excellent', 'no_reply', 'popular', 'recent'].include?(params[:type])
+        @topics = @topics.includes(:user).paginate(:page => params[:page], :per_page => params[:per_page] || 30)
         present @topics, :with => APIEntities::Topic
       end
 
@@ -56,12 +59,14 @@ module RubyChina
       end
 
       # Get topic detail
+      # params:
+      #   include_deleted(optional)
       # Example
       #   /api/topics/1.json
       get ":id" do
-        @topic = Topic.includes(:replies).find_by_id(params[:id])
+        @topic = Topic.find_by_id(params[:id])
         @topic.hits.incr(1)
-        present @topic, :with => APIEntities::DetailTopic
+        present @topic, :with => APIEntities::DetailTopic, :include_deleted => params[:include_deleted]
       end
 
       # Post a new reply
